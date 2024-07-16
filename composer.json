@@ -1,12 +1,12 @@
 {
-    "name": "spedley/laravel-supernifty-cms",
+    "name": "supernifty/laravel-cms",
     "description": "A CMS package for Laravel.",
     "keywords": [
         "Supernifty",
         "laravel",
         "laravel-supernifty-cms"
     ],
-    "homepage": "https://github.com/spedley/laravel-supernifty-cms",
+    "homepage": "https://github.com/superniftydev/laravel-cms",
     "license": "MIT",
     "authors": [
         {

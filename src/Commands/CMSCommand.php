@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 
 class CMSCommand extends Command
 {
-    public $signature = 'laravel-supernifty-cms';
+    public $signature = 'laravel-cms';
 
     public $description = 'My command';
 

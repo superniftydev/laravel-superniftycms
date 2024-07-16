@@ -28,9 +28,13 @@ class TestCase extends Orchestra
     {
         config()->set('database.default', 'testing');
 
-        /*
-        $migration = include __DIR__.'/../database/migrations/create_laravel-supernifty-cms_table.php.stub';
-        $migration->up();
-        */
+        $media = include __DIR__.'/../database/migrations/create_media_table.php.stub';
+        $redirects = include __DIR__.'/../database/migrations/create_redirects_table.php.stub';
+        $topics = include __DIR__.'/../database/migrations/create_topics_table.php.stub';
+
+        $media->up();
+        $redirects->up();
+        $topics->up();
+
     }
 }

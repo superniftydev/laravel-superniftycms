@@ -1,0 +1,38 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('media', function (Blueprint $table) {
+            $table->uuid('id', 36)->primary();
+            $table->string('location',25); # local | youtube | vimeo | aws | do | etc
+            $table->string('type',25); # jpg | png | gif | m4v | pdf | doc | aif | etc
+            $table->string('vendor_media_id',250)->nullable(); # youtube video id | vimeo video id
+            $table->json('metas')->nullable();
+            $table->uuid('created_by');
+            $table->uuid('last_updated_by');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('media');
+    }
+};

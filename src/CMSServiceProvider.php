@@ -2,9 +2,12 @@
 
 namespace Supernifty\CMS;
 
+use Illuminate\Support\Facades\Route;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Supernifty\CMS\Commands\CMSCommand;
+use Supernifty\CMS\Http\Controllers\TopicController;
+use Supernifty\CMS\Models\Topic;
 
 class CMSServiceProvider extends PackageServiceProvider
 {
@@ -19,7 +22,29 @@ class CMSServiceProvider extends PackageServiceProvider
             ->name('laravel-supernifty-cms')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_laravel-supernifty-cms_table')
+            ->hasMigration('create_media_table')
+            ->hasMigration('create_topics_table')
+            ->hasMigration('create_redirects_table')
             ->hasCommand(CMSCommand::class);
     }
+
+
+    public function packageRegistered() {
+
+
+        Route::macro('superniftyCMS', function (string $baseURL = 'dashboard') {
+            Route::prefix($baseURL)->group(function () {
+                Route::get('fuckme', [ TopicController::class, 'fuckme']);
+
+
+            });
+        });
+
+
+        # Route::superniftyCMS('whatever-the-developer-wants'); # /whatever-the-developer-wants/fuckme
+
+
+
+    }
 }
+

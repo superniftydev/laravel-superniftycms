@@ -18,7 +18,7 @@ class CMSServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('laravel-cms')
+            ->name('laravel-superniftycms')
             ->hasConfigFile()
             ->hasViews()
             ->hasMigration('create_media_table')

@@ -14,7 +14,20 @@ class TopicController extends Controller
 {
     public function fuckme()
     {
-        return 'fuckme';
+        $topic = "I told you to fuck me.";
+        return view('superniftycms::edit', [ 'topic' => $topic ] );
+    }
+
+    public function eatshit()
+    {
+        $topic = "I told you to eat shit.";
+        return view('superniftycms::edit', [ 'topic' => $topic ] );
+    }
+
+    public function dieinafire()
+    {
+        $topic = "I told you to die in a fire.";
+        return view('superniftycms::edit', [ 'topic' => $topic ] );
     }
 
     // confirm unique topic slug

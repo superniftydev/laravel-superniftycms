@@ -21,6 +21,7 @@ class CMSServiceProvider extends PackageServiceProvider
             ->name('laravel-superniftycms')
             ->hasConfigFile()
             ->hasViews()
+            ->hasAssets()
             ->hasMigration('create_media_table')
             ->hasMigration('create_topics_table')
             ->hasMigration('create_redirects_table')
@@ -30,9 +31,11 @@ class CMSServiceProvider extends PackageServiceProvider
     public function packageRegistered()
     {
 
-        Route::macro('superniftyCMS', function (string $baseURL = 'dashboard') {
+        Route::macro('superniftycms', function (string $baseURL = 'dashboard') {
             Route::prefix($baseURL)->group(function () {
                 Route::get('fuckme', [TopicController::class, 'fuckme']);
+                Route::get('eatshit', [TopicController::class, 'eatshit']);
+                Route::get('dieinafire', [TopicController::class, 'dieinafire']);
 
             });
         });

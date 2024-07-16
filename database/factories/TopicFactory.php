@@ -5,7 +5,6 @@ namespace Supernifty\CMS\Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Supernifty\CMS\Models\Topic;
 
-
 class TopicFactory extends Factory
 {
     protected $model = Topic::class;
@@ -17,12 +16,11 @@ class TopicFactory extends Factory
             'url' => $this->faker->filePath(),
             'title' => $this->faker->sentence(),
             'functionality' => $this->faker->unique()->word(),
-            'layout' => $this->faker->randomElement(['custom','post','home','about','contact','default']),
-            'status' => $this->faker->randomElement(['draft','live','review','feedback','copy','layout']),
+            'layout' => $this->faker->randomElement(['custom', 'post', 'home', 'about', 'contact', 'default']),
+            'status' => $this->faker->randomElement(['draft', 'live', 'review', 'feedback', 'copy', 'layout']),
         ];
     }
 }
-
 
 /*
     $table->uuid('id', 36)->primary();

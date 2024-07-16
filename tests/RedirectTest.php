@@ -1,6 +1,5 @@
 <?php
 
-
 use Supernifty\CMS\Models\Redirect;
 
 it('can create redirect', function () {

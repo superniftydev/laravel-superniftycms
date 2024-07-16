@@ -7,7 +7,6 @@ use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Supernifty\CMS\Commands\CMSCommand;
 use Supernifty\CMS\Http\Controllers\TopicController;
-use Supernifty\CMS\Models\Topic;
 
 class CMSServiceProvider extends PackageServiceProvider
 {
@@ -28,23 +27,17 @@ class CMSServiceProvider extends PackageServiceProvider
             ->hasCommand(CMSCommand::class);
     }
 
-
-    public function packageRegistered() {
-
+    public function packageRegistered()
+    {
 
         Route::macro('superniftyCMS', function (string $baseURL = 'dashboard') {
             Route::prefix($baseURL)->group(function () {
-                Route::get('fuckme', [ TopicController::class, 'fuckme']);
-
+                Route::get('fuckme', [TopicController::class, 'fuckme']);
 
             });
         });
 
-
-        # Route::superniftyCMS('whatever-the-developer-wants'); # /whatever-the-developer-wants/fuckme
-
-
+        // Route::superniftyCMS('whatever-the-developer-wants'); # /whatever-the-developer-wants/fuckme
 
     }
 }
-

@@ -1,20 +1,21 @@
 <?php
 
 namespace Supernifty\CMS\Models;
-use Illuminate\Database\Eloquent\Model;
+
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Topic extends Model
 {
-
     use HasFactory;
     use HasUuids;
 
     public $guarded = [];
 
-    # declaring media as a public variable means Laravel will ignore it when calling $topic->save();
+    // declaring media as a public variable means Laravel will ignore it when calling $topic->save();
     public $medias;
+
     public $mediaJSON;
 
     /**
@@ -22,9 +23,6 @@ class Topic extends Model
      *
      * @var array
      */
-
-
-
     protected $fillable = [
         'title',
         'slug',
@@ -34,7 +32,7 @@ class Topic extends Model
         'settings',
         'content',
         'metas',
-        'status'
+        'status',
     ];
 
     protected $casts = [
@@ -42,7 +40,4 @@ class Topic extends Model
         'content' => 'json',
         'metas' => 'json',
     ];
-
 }
-
-

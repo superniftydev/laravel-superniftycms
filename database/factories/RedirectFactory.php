@@ -5,7 +5,6 @@ namespace Supernifty\CMS\Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Supernifty\CMS\Models\Redirect;
 
-
 class RedirectFactory extends Factory
 {
     protected $model = Redirect::class;
@@ -16,14 +15,13 @@ class RedirectFactory extends Factory
             'id' => $this->faker->uuid(),
             'old_url' => $this->faker->url(),
             'new_url' => $this->faker->url(),
-            'type' => $this->faker->randomElement(['301','302']),
-            'active' => $this->faker->randomElement([0,1]),
+            'type' => $this->faker->randomElement(['301', '302']),
+            'active' => $this->faker->randomElement([0, 1]),
             'created_by' => $this->faker->uuid(),
             'last_updated_by' => $this->faker->uuid(),
         ];
     }
 }
-
 
 /*
     $table->string('old_url',2500)->nullable();

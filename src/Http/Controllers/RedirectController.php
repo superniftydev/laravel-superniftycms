@@ -9,29 +9,31 @@ use Illuminate\Support\Facades\Auth;
 
 class RedirectController extends Controller
 {
-
-    # redirects index
-    public function index() {
+    // redirects index
+    public function index()
+    {
         $site = Site::where('domain', sn_site_domain())->first();
+
         return response()->view('be.redirects.index', [
             'site' => $site,
-            'redirects' => Redirect::all()->sortBy([['created_at', 'desc']])
+            'redirects' => Redirect::all()->sortBy([['created_at', 'desc']]),
         ], 200);
     }
 
-    public function create(Request $request) {
+    public function create(Request $request)
+    {
 
         $environment = Environment::where([
-            ['domain', '=',sn_site_domain()],
-            ['slug', '=', sn_site_environment()]
+            ['domain', '=', sn_site_domain()],
+            ['slug', '=', sn_site_environment()],
         ])->orWhere(function (Builder $query) {
             $query->where([
                 ['domain_alias', '=', sn_site_domain()],
-                ['slug', '=', sn_site_environment()]
+                ['slug', '=', sn_site_environment()],
             ]);
         })->first();
 
-        if(isset($environment->id)){
+        if (isset($environment->id)) {
             $redirect = new Redirect;
             $redirect->environment_id = $environment->id;
             $redirect->created_by = Auth::id();
@@ -40,14 +42,17 @@ class RedirectController extends Controller
             $redirect->type = $request->type;
             isset($request->active) ? $redirect->active = true : $redirect->active = false;
             $redirect->save();
+
             return redirect()->action([RedirectController::class, 'index']);
+        } else {
+            dd('unable to create redirect...');
         }
-        else dd('unable to create redirect...');
     }
 
-    public function save(Request $request) {
+    public function save(Request $request)
+    {
         $redirect = Redirect::find($request->redirect_id);
-        if(isset($redirect->id)){
+        if (isset($redirect->id)) {
             $redirect->old_url = $request->old_url;
             $redirect->new_url = $request->new_url;
             $redirect->type = $request->type;
@@ -55,13 +60,13 @@ class RedirectController extends Controller
             $redirect->save();
             $result = "Redirect {$request->redirect_id} was updated...";
             $action = 'updated';
-        }
-        else {
+        } else {
             $result = "Unable to find redirect {$request->redirect_id}...";
             $action = 'failed';
         }
 
         isset($redirect->id) ? $redirect_id = $redirect->id : $redirect_id = 'N/A';
+
         return response()->json([
             'status' => 200,
             'result' => $result,
@@ -70,19 +75,17 @@ class RedirectController extends Controller
         ]);
     }
 
-    # destroy redirect
-    public function destroy(Request $request) {
+    // destroy redirect
+    public function destroy(Request $request)
+    {
         $redirect = Redirect::find($request->redirect_id);
-        if(isset($redirect->id)){
+        if (isset($redirect->id)) {
             $redirect->delete();
+
             return response()->json([
                 'status' => 200,
-                'result' => "{$redirect->id} was deleted..."
+                'result' => "{$redirect->id} was deleted...",
             ]);
         }
     }
-
-
-
-
 }

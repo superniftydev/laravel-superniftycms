@@ -46,7 +46,12 @@ return [
 Optionally, you can publish the views using
 
 ```bash
-php artisan vendor:publish --tag="laravel-supernifty-cms-views"
+php artisan vendor:publish --tag="superniftycms-views"
+php artisan vendor:publish --tag="superniftycms-assets"
+
+php artisan install superniftycms:install
+
+
 ```
 
 ## Usage
@@ -55,6 +60,15 @@ php artisan vendor:publish --tag="laravel-supernifty-cms-views"
 $cMS = new Supernifty\CMS();
 echo $cMS->echoPhrase('Hello, Supernifty!');
 ```
+
+
+
+
+
+
+
+
+
 
 ## Testing
 

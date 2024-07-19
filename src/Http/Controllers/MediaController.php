@@ -22,6 +22,9 @@ use Throwable;
 
 class MediaController extends Controller
 {
+
+    protected $table = 'superniftycms_media';
+
     public function index()
     {
         //
@@ -379,12 +382,7 @@ class MediaController extends Controller
 
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Http\Requests\UpdateMediaRequest  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
+
     public function updatedetails(UpdateMediaRequest $request)
     {
         $media = Media::find($request->media_id);
@@ -647,53 +645,4 @@ class MediaController extends Controller
 
     }
 
-    public function fpo(Media $media)
-    {
-        $filename = base_path('sites/kmmgrp.com/media/9c3195b2-7572-4e54-969b-057d6af77626/original.jpg');
-
-        if (! file_exists($filename)) {
-            throw new InvalidArgumentException('File "'.$filename.'" not found.');
-        }
-        switch (strtolower(pathinfo($filename, PATHINFO_EXTENSION))) {
-            case 'jpeg':
-            case 'jpg':
-                $image = imagecreatefromjpeg($filename);
-                break;
-
-            case 'png':
-                $image = imagecreatefrompng($filename);
-                break;
-
-            case 'gif':
-                $image = imagecreatefromgif($filename);
-                break;
-
-            default:
-                throw new InvalidArgumentException('File "'.$filename.'" is not valid jpg, png or gif image.');
-                break;
-        }
-
-        $text = 'FPO';
-        $width = 1920;
-        $height = 1080;
-        $font_size = $height / 2;
-        $angle = 5;
-        $font = resource_path('fonts/Anton.ttf');
-        // $image = imagecreatetruecolor($width, $height);
-        // $background_color = imagecolorallocate($image, 0, 0, 0);
-        // imagecolortransparent($image, $background_color); # transparent
-        $text_color = imagecolorallocatealpha($image, 255, 255, 255, 0);
-
-        // 9c3195b2-7572-4e54-969b-057d6af77626
-
-        $bbox = imagettfbbox($font_size, $angle, $font, $text);
-
-        $x = $bbox[0] + (imagesx($image) / 2) - ($bbox[4] / 2) - 25;
-        $y = $bbox[1] + (imagesy($image) / 2) - ($bbox[5] / 2) - 5;
-
-        imagettftext($image, $font_size, $angle, $x, $y, $text_color, $font, $text);
-        header('Content-type: image/png');
-        echo imagepng($image);
-        exit;
-    }
 }

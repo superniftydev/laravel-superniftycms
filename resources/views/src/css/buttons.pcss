@@ -1,0 +1,86 @@
+.btn {
+
+    @apply uppercase rounded shadow-sm font-semibold transition-all focus:outline-none;
+
+    &.xs { @apply px-2 py-1 text-xs; }
+    &.sm { padding: .375rem 1rem; font-size: .75rem; }
+    &.md { @apply px-2.5 py-1.5 text-sm; }
+    &.lg { @apply px-3 py-2 text-sm; }
+    &.xl { @apply px-4 py-2.5 text-sm; }
+
+    user-select: none;
+
+
+    &.db {
+        display: flex;
+        justify-content:center;
+        align-items: center;
+        &:before {
+            font-family: 'Material Symbols Outlined';
+            font-variation-settings: 'FILL' 1, 'wght' 700, 'GRAD' 200, 'opsz' 48;
+            content: '\f20e';
+        }
+    }
+
+
+}
+
+
+.snbtn {
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: .25rem;
+    background-color: transparent;
+    border: 1px solid transparent;
+    transition: all 250ms ease-in-out;
+    padding: 0 1rem;
+    color: var(--color-gray-500);
+    font-size: .875rem;
+    line-height: 2;
+    font-weight: 400;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+
+    &.b {
+        border: 1px solid currentColor;
+    }
+
+    &:hover {
+        color: var(--color-gray-900);
+        background-color: var(--color-gray-100);
+    }
+
+    &.danger {
+        &:hover {
+            color: var(--color-red-400);
+            background-color: var(--color-red-100);
+        }
+
+        &.confirm {
+            color: var(--color-white);
+            background-color: var(--color-red-500);
+        }
+    }
+
+    &.xs { font-size: .5rem; line-height: 2; }
+    &.sm { font-size: .75rem; line-height: 2; }
+    &.md { font-size: .875rem; line-height: 2; }
+    &.lg { font-size: 1rem; line-height: 2; }
+    &.xl { font-size: 1.25rem; line-height: 2; }
+
+}
+
+
+
+
+
+
+
+
+
+
+

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('redirects', function (Blueprint $table) {
+        Schema::create('superniftycms_redirects', function (Blueprint $table) {
             $table->uuid('id', 36)->primary();
             $table->string('old_url',2500)->nullable();
             $table->string('new_url',2500)->nullable();
@@ -28,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('redirects');
+        Schema::dropIfExists('superniftycms_redirects');
     }
 };

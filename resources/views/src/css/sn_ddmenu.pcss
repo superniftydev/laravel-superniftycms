@@ -1,0 +1,257 @@
+
+
+
+
+.sn_ddmenu {
+
+    position: relative;
+    font-size: .875rem;
+    transition: all 250ms ease-in-out;
+    color: var(--color-gray-400);
+    user-select: none;
+    cursor: pointer;
+
+    i {
+
+        border: none;
+        display: flex;
+        flex-direction: row;
+        font-style: normal;
+        line-height: 1;
+        position: relative!important;
+        padding: .125em 1em .2em 1em!important;
+        justify-content: space-between;
+        align-items: center;
+        text-align: center;
+        font-family: var(--font-family-sans-serif);
+        color: var(--color-white);
+        font-size: .75em;
+        white-space: nowrap;
+        border-radius: .25em;
+        width:100%;
+        border-color: var(--color-gray-400);
+        margin: 0 .25em 0 0!important;
+        transition: all 250ms ease-in-out;
+
+        &:before {
+            margin: .1em 0 0 0;
+        }
+
+        &:after {
+
+            font-family: 'Material Symbols Outlined';
+            font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 200, 'opsz' 48;
+            content: '\e5c5'!important;
+            z-index: 2;
+            margin: 0 0 0 1em;
+            font-size: 1.25em!important;
+
+        }
+    }
+
+    &.addfield {
+
+        i {
+            padding: .75em 1em .5em 1em!important;
+        }
+        ul {
+            li {
+                font-size: .875em;
+            }
+        }
+
+    }
+
+    ul {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 1.5rem;
+        left: .5rem;
+        z-index: 2;
+        list-style: none!important;
+        color: var(--color-gray-400);
+        font-size: inherit;
+        border: 1px solid var(--color-gray-50);
+        background-color: var(--color-white);
+        border-radius: .25rem;
+        box-shadow: 1px 2px 3px rgba(0,0,0,.1);
+        padding: .25rem 0!important;
+        opacity: 0;
+        pointer-events: none;
+
+    }
+
+    &.right ul {
+        left: revert;
+        right: .25rem;
+
+    }
+
+    &.active ul {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    &.li ul li {
+        position: relative;
+        display: block;
+        padding: .5rem 1.5rem;
+        cursor: pointer;
+        transition: inherit;
+        white-space: nowrap;
+
+        &:hover {
+            background-color: var(--color-blue-50)!important;
+            color: var(--color-blue-400)!important;
+        }
+
+        &[data-action='delete']:hover {
+            background-color: var(--color-red-50)!important;
+            color: var(--color-red-500)!important;
+        }
+
+
+        &.destroyContentOrMetaField,
+        &.destroyContentOrMetaField:hover,
+        &.destroyContentOrMetaField:focus,
+        &.destroyContentOrMetaField:active
+        {
+            color: var(--color-red-500)!important;
+            background-color: var(--color-red-50)!important;
+        }
+    }
+
+}
+
+
+.sn_ddmenu.status {
+    position: relative;
+    font-size: 1rem!important;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    text-transform: uppercase;
+    padding: 0!important;
+    border-radius: 0;
+    margin: 0 .5em;
+
+    &:before {
+        position: absolute;
+        top: -1rem;
+        left: 0;
+        content: 'STATUS:';
+        font-size: .625rem;
+        color: var(--color-gray-400);
+    }
+
+    i {
+        padding: .5rem 1rem!important;
+        &:before { content: attr(data-l)!important; }
+    }
+
+    ul {
+
+        padding: 0!important;
+        top: .5em!important;
+        width: 100%!important;
+        min-width: 100%!important;
+        z-index: 4;
+
+        li {
+            display: flex;
+            flex-direction: row!important;
+            align-items: center!important;
+            font-size: .675em!important;
+            padding: .5em 1em .5em .5em!important;
+            margin: 0!important;
+            color: var(--color-gray-500)!important;
+            background-color: var(--color-white)!important;
+            border-radius: 0!important;
+            width: 100%!important;
+            text-align: left;
+            justify-content: flex-start;
+
+            &:before {
+                font-family: 'Material Symbols Outlined';
+                font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 200, 'opsz' 48;
+                background-color: transparent!important;
+                color: transparent!important;
+                content: '\e5ca'!important;
+                margin-right: .5em;
+            }
+
+            &:after {
+                background-color: transparent!important;
+                content: attr(data-l)!important;
+                white-space: nowrap!important;
+            }
+
+            &:hover,
+            &:hover:after {
+                color: var(--color-blue-500)!important;
+                background-color: var(--color-blue-50)!important;
+            }
+
+        }
+
+    }
+
+    &.active {
+        ul li {
+            pointer-events: auto;
+        }
+    }
+
+}
+
+
+
+#topicList ul li .w ol li .sn_ddmenu.status {
+    &:before { display: none!important; }
+
+
+    font-size: .875rem!important;
+    width: 125px!important;
+
+    i {
+        padding: .125em .5em!important;
+        &:before {
+            font-size: .875em!important;
+            font-weight: 400!important;
+
+        }
+        &:after {
+            margin: 0!important;
+        }
+    }
+    ul li {
+        &:after { color: var(--color-gray-400)!important; }
+        &:hover:after { color: var(--color-blue-400)!important; }
+    }
+
+}
+
+.sn_ddmenu.li {
+
+    margin-left: auto;
+
+
+    i {
+        text-transform: uppercase;
+        border: 1px solid var(--color-gray-400);
+        color: var(--color-gray-400);
+    }
+
+    &.active i,
+    &:hover i {
+        background-color: var(--color-white);
+        border: 1px solid var(--color-gray-500);
+        color: var(--color-gray-500);
+    }
+}
+
+
+
+

@@ -7,28 +7,60 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Supernifty\CMS\Facades\CMS;
 use Supernifty\CMS\Models\Topic;
 use Throwable;
 
 class TopicController extends Controller
 {
-    public function fuckme()
-    {
-        $topic = "I told you to fuck me.";
-        return view('superniftycms::edit', [ 'topic' => $topic ] );
+
+
+    public function dashboard(Request $request){
+
+        $user = Auth::user();
+        if(config('superniftycms.access.policy') !== '*'){
+            if(config('superniftycms.access.policy') === 'auth'){
+                if(is_null($user)) return redirect()->guest(route('login'));
+            }
+            else {
+                $model = config('superniftycms.auth.model');
+                $column = config('superniftycms.auth.column');
+                $value = config('superniftycms.auth.value');
+                if($$model->$column !== $value) { dd('you are not authorized to use this feature...'); }
+            }
+        }
+
+        return response()->view('vendor.superniftycms.dashboard', [
+            'user' => $user,
+            'topics' => config('superniftycms.topics'),
+        ], 200);
     }
 
-    public function eatshit()
+
+
+
+
+    // topic group index
+    public function index($id)
     {
-        $topic = "I told you to eat shit.";
-        return view('superniftycms::edit', [ 'topic' => $topic ] );
+        if (isset($id)) {
+            $parent = Topic::find($id);
+            if (isset($parent->id)) {
+                $children = Topic::where('parent', $parent->id)->orderBy('created_at', 'desc')->get();
+
+                // dd($children);
+                return response()->view('be.topics.index', [
+                    'parent' => $parent,
+                    'children' => $children,
+                ], 200);
+            }
+
+            return response()->view('be.errors.basic', [
+                'message' => "Couldn't find that topic.",
+            ], 200);
+        }
     }
 
-    public function dieinafire()
-    {
-        $topic = "I told you to die in a fire.";
-        return view('superniftycms::edit', [ 'topic' => $topic ] );
-    }
 
     // confirm unique topic slug
     public function validatetopicurl(Request $request)
@@ -66,49 +98,30 @@ class TopicController extends Controller
     public function manage($do)
     {
 
+
         $user = Auth::user();
-        if ($user->status === 'registered') {
-            $user->status = 'active';
-            $user->save();
+
+
+        if ($do === 'redirects') {
+            return redirect()->route('be.redirects.index');
         }
 
-        // try the primary domain first
-        $environment = Environment::where([
-            ['domain', '=', sn_site_domain()],
-            ['slug', '=', sn_site_environment()],
-        ])->orWhere(function (Builder $query) {
-            $query->where([
-                ['domain_alias', '=', sn_site_domain()],
-                ['slug', '=', sn_site_environment()],
-            ]);
-        })->first();
-        // dd(sn_site_domain(), sn_site_environment(), $environment);
+        $x = Topic::where('functionality', $do)->get();
+        $key = array_search($do, array_column(config('superniftycms.topics'), 'functionality'));
+        $settings = config("superniftycms.topics.{$key}");
 
-        if (sn_can('content')) {
+        if (!$x->isEmpty()) $topics = CMS::organize_topics($x);
+        else $topics = [];
 
-            if ($do === 'redirects') {
-                return redirect()->route('be.redirects.index');
-            }
+        # dd($topics, $key, $settings);
 
-            $x = Topic::where('functionality', $do)->get();
+        return response()->view('vendor.superniftycms.manage', [
+            'user' => $user,
+            'topics' => CMS::dash_topics($topics, 1),
+            'settings' => $settings,
+        ], 200);
 
-            if (! $x->isEmpty()) {
-                $topics = sn_organize_topics($x);
-                $settings = sn_config('topics.topics.'.$x->first()->functionality);
-                $settings['functionality'] = $x->first()->functionality;
-            } else {
-                $topics = [];
-                $settings = sn_config('topics.topics.'.$do);
-                $settings['functionality'] = $do;
-            }
 
-            return response()->view('be.manage', [
-                'user' => $user,
-                'topics' => $topics,
-                'settings' => $settings,
-            ], 200);
-
-        }
 
     }
 
@@ -250,7 +263,7 @@ class TopicController extends Controller
             // print_r($topic->metas);
             // exit;
 
-            $topic = sn_get_topic_media($topic);
+            $topic = CMS::get_topic_media($topic);
 
             // dd($topic);
             if (str_contains($topic->url, '/')) {
@@ -314,26 +327,6 @@ class TopicController extends Controller
 
     }
 
-    // topic group index
-    public function index($id)
-    {
-        if (isset($id)) {
-            $parent = Topic::find($id);
-            if (isset($parent->id)) {
-                $children = Topic::where('parent', $parent->id)->orderBy('created_at', 'desc')->get();
-
-                // dd($children);
-                return response()->view('be.topics.index', [
-                    'parent' => $parent,
-                    'children' => $children,
-                ], 200);
-            }
-
-            return response()->view('be.errors.basic', [
-                'message' => "Couldn't find that topic.",
-            ], 200);
-        }
-    }
 
     // create new topic
     public function settings($id, $do = false)

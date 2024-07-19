@@ -15,7 +15,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('topics', function (Blueprint $table) {
+        Schema::create('superniftycms_topics', function (Blueprint $table) {
             $table->uuid('id', 36)->primary();
             $table->string('url', 500)->unique()->nullable();
             $table->string('title',500)->default('Untitled Topic')->index();
@@ -38,6 +38,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('topics');
+        Schema::dropIfExists('superniftycms_topics');
     }
 };

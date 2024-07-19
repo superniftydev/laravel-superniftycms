@@ -2,4 +2,7 @@
 
 namespace Supernifty\CMS;
 
-class CMS {}
+class CMS {
+
+
+}

@@ -1,3 +1,0 @@
-/* superniftycms js */
-
-alert('hello');

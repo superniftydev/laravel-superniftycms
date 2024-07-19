@@ -1,0 +1,47 @@
+:root {
+    --super_circle_size: 4rem;
+    --super_text_size: 3.2rem;
+}
+
+.superCircle {
+    width: var(--super_circle_size);
+    height: var(--super_circle_size);
+    border-radius: var(--super_circle_size);
+    font-size: var(--super_text_size);
+    line-height: 1;
+    font-style: normal;
+    background-color: var(--color-gray-500);
+    color: var(--color-white);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    font-weight: 900;
+    font-family: 'Inter', sans-serif;
+    transition: all 250ms ease-in-out;
+    text-transform:uppercase;
+    &:before {
+        content: attr(data-i);
+    }
+    &:hover {
+        transform: scale(1.25) rotate(360deg);
+        background-color: var(--color-blue-500);
+    }
+    &.sn { transform: rotate(-7.5deg); }
+}
+
+svg.sn-ball {
+    position: relative;
+    padding: 0;
+    width: 50px;
+    height: 50px;
+    margin-bottom: 2em;
+    transition: all 250ms ease-in-out;
+    fill: var(--color-white);
+
+    &:hover {
+        transform: scale(1.1) rotate(360deg);
+    }
+}
+
+

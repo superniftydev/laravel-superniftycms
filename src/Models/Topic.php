@@ -11,6 +11,9 @@ class Topic extends Model
     use HasFactory;
     use HasUuids;
 
+    protected $table = 'superniftycms_topics';
+
+
     public $guarded = [];
 
     // declaring media as a public variable means Laravel will ignore it when calling $topic->save();

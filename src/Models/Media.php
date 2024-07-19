@@ -11,6 +11,8 @@ class Media extends Model
     use HasFactory;
     use HasUuids;
 
+    protected $table = 'superniftycms_media';
+
     protected $fillable = [
         'id',
         'location',

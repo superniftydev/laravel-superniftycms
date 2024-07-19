@@ -14,10 +14,9 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('media', function (Blueprint $table) {
+        Schema::create('superniftycms_media', function (Blueprint $table) {
             $table->uuid('id', 36)->primary();
-            $table->string('location',25); # local | youtube | vimeo | aws | do | etc
-            $table->string('type',25); # jpg | png | gif | m4v | pdf | doc | aif | etc
+            $table->string('type',25); # jpg | png | gif | mp4 | pdf | doc | aif | youtube | vimeo
             $table->string('vendor_media_id',250)->nullable(); # youtube video id | vimeo video id
             $table->json('metas')->nullable();
             $table->uuid('created_by');
@@ -33,6 +32,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('media');
+        Schema::dropIfExists('superniftycms_media');
     }
 };

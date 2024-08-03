@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\Drivers\Imagick\Driver;
+use Intervention\Image\ImageManager;
 use InvalidArgumentException;
 use Maestroerror\HeicToJpg;
+use Supernifty\CMS\Facades\Helpers;
 use Supernifty\CMS\Models\Media;
 use Supernifty\CMS\Models\Topic;
 use Throwable;
@@ -25,352 +27,267 @@ class MediaController extends Controller
 
     protected $table = 'superniftycms_media';
 
-    public function index()
+
+    public function index($topic_id = false, $topic_field_type = false, $topic_field = false)
     {
-        //
+
+        $rawMedia = Media::orderByRaw('updated_at DESC')->get(); // all media
+        $ids = $rawMedia->pluck('id')->toArray();
+
+        // dd($ids, $topic_id, $topic_field);
+
+        // get field-specific media
+        $topic = null;
+        $fieldMedia = '';
+        if ($topic_id && $topic_field_type && $topic_field) {
+            $topic = Topic::find($topic_id);
+            // dd($ids, $topic_id, $topic_field_type, $topic_field, $topic);
+            if (
+                isset($topic->{$topic_field_type}) &&
+                isset($topic->{$topic_field_type}[$topic_field]) &&
+                is_array($topic->{$topic_field_type}[$topic_field]) &&
+                count($topic->{$topic_field_type}[$topic_field]) > 0
+            ) {
+                $fieldMedia = implode('|', $topic->{$topic_field_type}[$topic_field]['value']);
+            }
+        }
+
+        $data = [
+            'allMedia' => Helpers::dropzone_media($ids),
+            'fieldMedia' => $fieldMedia,
+            'topic' => $topic,
+            'topic_field_type' => $topic_field_type,
+            'topic_field' => $topic_field,
+        ];
+
+        // dd($data);
+
+        return response()->view('media.index', $data);
+
     }
+
+
 
     public function saver(Request $request)
     {
 
-        // print_r($request->all()); exit;
-
         try {
 
-            $new_topic = false;
-            $topic_id = null;
-            $urls = null;
-            $mime_type = null;
-            $original_file_size = null;
 
-            // if the media is to be associated with a specific topic
-            if ($request->has('topic_id')) {
+            # featured image is being uploaded
+            if(
+                $request->hasFile('file') &&
+                $request->has('featured_media_id')
+            ){
+
                 $topic = Topic::find($request->topic_id);
-            }
+                if(isset($topic->id)){
+                    $file = $request->file('file');
+                    $dimensions = explode('x', config('superniftycms.uploads.images.featured.dimensions'));
+                    if(Str::isUuid($request->featured_media_id)) $media = Media::find($request->featured_media_id);
+                    if(!isset($media->id)){
+                        $media = new Media;
+                        $media->created_by = Auth::id();
+                        $media->last_updated_by = Auth::id();
+                    }
+                    $media->type = $file->extension(); // jpg | png | gif
+                    $media->save();
+                    $media->refresh();
+                    $manager = new ImageManager(
+                        Driver::class,
+                        autoOrientation: true,
+                        decodeAnimation: true,
+                        blendingColor: '232527'
+                    );
+                    $image = $manager->read($request->file('file'));
+                    $image->cover($dimensions[0], $dimensions[1]);
+                    Storage::disk(config('superniftycms.uploads.disk'))->put(config('superniftycms.uploads.storage_directory')."/{$media->id}/original.".$file->extension(), (string) $image->encodeByExtension($file->extension()), 'public');
 
-            // if there is a topic, get the sort order
-            if (isset($topic->id)) {
-                $topic_id = $topic->id;
-            }
+                    $metas = $topic->metas;
+                    $metas['featured_media_id'] = $media->id;
+                    $topic->metas = $metas;
+                    $topic->save();
+                    return response()->json([
+                        'status' => 200,
+                        'topic' => $topic,
+                        'media' => $media,
+                        'featured_media_id' => $media->id,
+                        'message' => 'the featured image has been updated...',
+                    ]);
 
-            // find or create media
-            $media = Media::find($request->media_id);
 
-            // print_r($media);
-            // exit;
-
-            $meta = [];
-
-            // creating new media instance
-            if (! isset($media->id) || $request->media_id === 'new') {
-
-                // for external vendors, location and type might share the same value (eg: youtube)
-                if (! isset($request->location)) {
-                    $request->location = $request->type;
                 }
-                $media = new Media;
-                $media->location = $request->location; // sn | youtube | vimeo | aws | do | etc
-                $media->type = $request->location; // youtube | vimeo | gif | mov | pdf | svg | etc
-                $media->created_by = Auth::id();
-                if (isset($request->meta)) {
-                    $media = sn_update_media_metas($media, $request->meta);
-                }
-                $media->last_updated_by = Auth::id();
-                $media->save();
+
+
+
             }
 
-            // saving an existing media
+            # standard media files
             else {
 
-                // youtube / vimeo media
-                if (isset($request->vendor_media_id)) {
+                $topic = Topic::find($request->topic_id);
+                $media = Media::find($request->media_id);
+
+                # new
+                if(!isset($media->id)) {
+                    $media = new Media;
+                    $media->created_by = Auth::id();
+                    $media->last_updated_by = Auth::id();
+                }
+
+                # external vendor
+                if(isset($request->vendor_media_id)) {
                     $media->vendor_media_id = $request->vendor_media_id;
                     $media->type = $request->type;
                 }
 
-                if (isset($request->metas)) {
-                    $media = sn_update_media_metas($media, $request->metas);
+                # update metas
+                if(isset($request->metas)) $media = Helpers::update_media_metas($media, $request->metas);
+
+                # add the media to the topic content sort order
+                if (
+                    isset($topic->content) &&
+                    $request->has('topic_field') &&
+                    $request->has('field_type') # 'content' | 'metas'
+                ) {
+                    if($request->field_type === 'content') $holder = $topic->content;
+                    else $holder = $topic->metas;
+                    if(!is_array($holder)) $holder = [];
+                    if(isset($holder)) {
+                        if(!isset($holder[$request->get('topic_field')])) $holder[$request->get('topic_field')] = [];
+                        if(!in_array($media->id, $holder[$request->get('topic_field')])) array_unshift($holder[$request->get('topic_field')], $media->id);
+                        if($request->field_type === 'content') $topic->content = $holder;
+                        else $topic->metas = $holder;
+                        $topic->save();
+                    }
                 }
 
-                $media->last_updated_by = Auth::id();
-                $media->save();
+                # existing ( no file upload )
+                if(!$request->hasFile('file')) {
+                    $media->save();
+                    return response()->json([
+                        'status' => 200,
+                        'media' => $media,
+                        'message' => 'here!',
+                    ]);
+                }
+
+                # a file is being uploaded - this is new
+                else {
+
+                    $metas = $media->metas;
+                    $file = $request->file('file');
+                    $original_file_size = $file->getSize();
+                    $mime_type = $file->getMimeType();
+                    $media->type = $file->extension(); // jpg | png | gif | m4v | pdf | doc | aif | heic | heif | etc ( laravel uses mime type to determine file extension)
+
+                    # special cases
+                    if($media->type === 'heic' || $media->type === 'heif') $media->type = 'jpg';
+                    if($media->type === 'bin') $media->type = 'glb';
+
+                    $metas['title'] = $file->getClientOriginalName();
+                    $metas['original_file_size'] = $original_file_size;
+                    $media->metas = $metas;
+
+                    # heic/heif - convert to jpg - later. getting the required server software installed is a pita...
+                    # https://image.intervention.io/v3/introduction/frameworks#integration
+                    # if (in_array($mime_type, ['image/heic', 'image/heif'])) {
+                    #     $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default')); // store the original
+                    #     $converted = HeicToJpg::convert($path_prefix.$media->id.'/original.'.$file->extension()); // convert the original to a jpg
+                    #     $converted->saveAs($path_prefix.$media->id.'/original.jpg'); // save the original as a jpg
+                    # }
+
+                    # it must be saved at this point in order to create the parent directory
+                    $media->save();
+
+                    # pixel-based images
+                    if (in_array($media->type, config('superniftycms.uploads.images.process'))) {
+                        try {
+                            $ext = $file->extension();
+
+                            $manager = new ImageManager(
+                                Driver::class,
+                                autoOrientation: true,
+                                decodeAnimation: true,
+                                blendingColor: '232527'
+                            );
+                            $image = $manager->read($request->file('file'));
+                            Storage::disk(config('superniftycms.uploads.disk'))->put(config('superniftycms.uploads.storage_directory')."/{$media->id}/original.".$file->extension(), (string) $image->encodeByExtension($file->extension()), 'public');
+
+                            $urls['original']  = Helpers::media_upload_url($media, 'original');
+                            $urls['thumbnail'] = Helpers::media_upload_url($media, 'thumbnail');
+
+                            # print_r($request->all());
+                            # print_r($media->getAttributes());
+                            # print Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$ext);
+                            # exit;
+
+                        } catch (Throwable $e) {
+                            Log::error($e->getMessage());
+                            return response()->json([
+                                'status' => 200,
+                                'topic_id' => null,
+                                'media_id' => null,
+                                'message' => 'Oops! Error! [2158]: '.$e->getMessage(),
+                            ]);
+                        }
+                    }
+
+                    // videos - generate thumbnail and send to processing
+                    elseif (in_array($media->type, config('superniftycms.uploads.videos.process'))) {
+                        $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.'.$file->extension(), config('superniftycms.uploads.disk'));
+
+                        # grab poster frame
+                        $ffmpeg = FFMpeg::create(config('superniftycms.uploads.videos.ffmpeg'), null);
+                        $video = $ffmpeg->open(Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$file->extension()));
+                        $video
+                            ->frame(TimeCode::fromSeconds(1)) # create poster 1 second in
+                            ->save(Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/poster.jpg'));
+                        $urls['poster'] = $urls['thumbnail'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/poster.jpg');
+
+                    }
+
+                    # bins that have been converted to glb in this temporary patch
+                    elseif ($media->type === 'glb') {
+                        $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.glb', config('superniftycms.uploads.disk'));
+                        $urls['original'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.glb');
+                    }
+
+                     // svgs
+                    elseif ($mime_type === 'image/svg+xml') {
+                        $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.glb', config('superniftycms.uploads.disk'));
+                        $urls['original'] = $urls['thumbnail'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.svg');
+                    }
+
+                    # all other file types
+                    else {
+                        $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.'.$file->extension(), config('superniftycms.uploads.disk'));
+                        $urls['original'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$media->type);
+                    }
+
+
+
+                }
 
                 return response()->json([
                     'status' => 200,
-                    'media' => $media,
-                    'message' => 'here!',
+                    'topic_id' => $topic->id,
+                    'media_id' => $media->id,
+                    'original_file_size' => $original_file_size,
+                    'original_mime_type' => $mime_type,
+                    'ext' => $media->type,
+                    'urls' => $urls,
+                    'created_by' => $media->created_by,
+                    'created_at' => $media->created_at->format(config('superniftycms.ui.time_format')),
+                    'last_updated_by' => $media->last_updated_by,
+                    'updated_at' => $media->updated_at->format(config('superniftycms.ui.time_format')),
                 ]);
 
-            }
-
-            // youtube or vimeo
-            if (isset($request->vendor_media_id)) {
-                $media->vendor_media_id = $request->vendor_media_id;
-                $media->type = $request->type;
-                $media->metas = $request->metas;
-                $media->save();
-            }
-
-            // a file is being uploaded
-            if ($request->hasFile('file')) {
-
-                // print_r('here'); exit;
-
-                $metas = $media->metas;
-                $path_prefix = sn_media_directory_public_path().'/'; // HeidToJpg and ffmpeg are both ignorant of Laravel pathing
-                // Log::debug("---> MediaController-> saver -> \$request=>hasFile() -> \$path_prefix: ".$path_prefix);
-
-                $file = $request->file('file');
-                $original_file_size = $file->getSize();
-                $mime_type = $file->getMimeType();
-                $media->location = config('filesystems.default'); // sn | aws | do | etc ( youtube and vimeo are also possible when not a file upload)
-                $media->type = $file->extension(); // jpg | png | gif | m4v | pdf | doc | aif | heic | heif | etc ( laravel uses mime type to determine file extension)
-                if ($media->type === 'heic' || $media->type === 'heif') {
-                    $media->type = 'jpg';
-                } // because it will be converted to a jpg on upload
-                if ($media->type === 'bin') {
-                    $media->type = 'glb';
-                }
-                $metas['title'] = $file->getClientOriginalName();
-                $metas['original_file_size'] = $original_file_size;
-                $media->metas = $metas;
-                $media_root_directory = "/{$media->id}";
-                $media->save();
-
-                // heic/heif - convert to jpg
-                if (in_array($mime_type, ['image/heic', 'image/heif'])) {
-                    $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default')); // store the original
-                    $converted = HeicToJpg::convert($path_prefix.$media->id.'/original.'.$file->extension()); // convert the original to a jpg
-                    $converted->saveAs($path_prefix.$media->id.'/original.jpg'); // save the original as a jpg
-                }
-
-                // non-heic images
-                elseif (in_array($mime_type, ['image/gif', 'image/jpeg', 'image/jpg', 'image/webp', 'image/png'])) {
-
-                    try {
-
-                        $mime_type === 'image/heic' ? $ext = 'jpg' : $ext = $file->extension(); // print $mime_type; exit;
-                        $img = Image::make($request->file('file'))->orientate();
-                        Storage::put($media_root_directory.'/original.'.$ext, $img->stream(), 'public');
-
-                    } catch (Throwable $e) {
-                        Log::error($e->getMessage());
-
-                        return response()->json([
-                            'status' => 200,
-                            'topic_id' => null,
-                            'media_id' => null,
-                            'message' => 'Oops! Error! [0704]: '.$e->getMessage(),
-                        ]);
-
-                    }
-
-                }
-
-                // videos - generate thumbnail and send to processing
-                elseif (in_array($media->type, config('uploads.videos.process'))) {
-
-                    /*
-                    'original_file_path' => $path_prefix."original.".$media->type,
-                    'width' => sn_extract_value('width=', $info), # 9c65d38e-3408-4657-b661-5de63580bbc1
-                    'height' => sn_extract_value('height=', $info),
-                    'rotation' => sn_extract_value('rotation=', $info),
-                    'seconds' => sn_extract_value('duration=', $info),
-                    'milliseconds' => sn_extract_value('duration_ts=', $info),
-                    'frame_rate' => sn_extract_value('avg_frame_rate=', $info),
-                    'bit_rate' => sn_extract_value('bit_rate=', $info),
-                    'size' => sn_extract_value('extradata_size=', $info),
-                    'format_name' => sn_extract_value('format_name=', $info),
-                    'format_long_name' => sn_extract_value('format_long_name=', $info),
-                    'upload_time' => sn_extract_value('TAG:creation_time=', $info),
-                    'TAG:com.apple.quicktime.location.accuracy.horizontal' => sn_extract_value('TAG:com.apple.quicktime.location.accuracy.horizontal=', $info),
-                    'TAG:com.apple.quicktime.location.ISO6709' => sn_extract_value('TAG:com.apple.quicktime.location.ISO6709=', $info),
-                    'TAG:com.apple.quicktime.make' => sn_extract_value('TAG:com.apple.quicktime.make=', $info),
-                    'TAG:com.apple.quicktime.model' => sn_extract_value('TAG:com.apple.quicktime.model=', $info),
-                    'TAG:com.apple.quicktime.software' => sn_extract_value('TAG:com.apple.quicktime.software=', $info),
-                    'TAG:com.apple.quicktime.creationdate' => sn_extract_value('TAG:com.apple.quicktime.creationdate=', $info)
-                    */
-                    // Log::debug('VIDEO');
-
-                    $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default'));
-
-                    // grab poster frame
-                    $ffmpeg = FFMpeg::create(config('ffmpeg'), null);
-                    $video = $ffmpeg->open($path_prefix.sn_media_path($media));
-                    $video
-                        ->frame(TimeCode::fromSeconds(1)) // create poster 1 second in
-                        ->save($path_prefix.$media_root_directory.'/poster.jpg');
-                    $urls['poster'] = sn_media_upload_url($media, 'poster');
-                    $urls['thumbnail'] = sn_media_upload_url($media, 'poster');
-
-                    $settings['video'] = [
-                        'square' => false,              // make it a perfect square? true|false - not implemented yet
-                        'framerate' => 30,              // eg: 30 is a youtube standard
-                        'gop' => 12,                    // eg: 12 - don't understand this
-                        'kilobitrate' => 8000,          // eg: 8000 is a youtube standard
-                        'audiochannels' => 2,           // eg: 2 - stereo
-                        'audiokilobitrate' => 384,      // eg: 384 is a youtube standard
-                    ];
-
-                    $data = sn_extract_video_data($media);
-
-                    // https://stackoverflow.com/questions/20847674/ffmpeg-libx264-height-not-divisible-by-2
-                    // Log::debug("initial video width: ". $data['width']);
-                    // Log::debug("initial video height: ". $data['height']);
-                    if ($data['width'] % 2 != 0) {
-                        $data['width']++;
-                    }
-                    if ($data['height'] % 2 != 0) {
-                        $data['height']++;
-                    }
-
-                    // Log::debug("========================================================================");
-                    // Log::debug("initial width modulus: ". $data['width'] % 2);
-                    // Log::debug("initial height modulus: ". $data['height'] % 2);
-                    // Log::debug("new video width: ". $data['width']);
-                    // Log::debug("new video height: ". $data['height']);
-                    // Log::debug("========================================================================");
-
-                    ProcessMP4::dispatch($media, $settings, $data)->onConnection('database');  // send to queued job
-                    ProcessWEBM::dispatch($media, $settings, $data)->onConnection('database'); // send to queued job
-                    ProcessOGG::dispatch($media, $settings, $data)->onConnection('database');  // send to queued job
-
-                }
-
-                // bins that have been converted to glb in this temporary patch
-                elseif ($media->type === 'glb') {
-                    $file->storeAs($media_root_directory, 'original.glb', config('filesystems.default'));
-                }
-
-                // all other file types
-                else {
-                    $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default'));
-                }
-
-                // $urls['original']  = secure_url('media/'.sn_media_path($media));
-
-                // all images - generate thumbnail
-                if (in_array($mime_type, ['image/gif', 'image/jpeg', 'image/jpg', 'image/webp', 'image/png', 'image/heic', 'image/heif'])) {
-                    $urls['original'] = sn_media_upload_url($media, 'original');
-                    $urls['thumbnail'] = sn_media_upload_url($media, 'thumbnail');
-                }
-
-                // svgs
-                elseif ($mime_type === 'image/svg+xml') {
-
-                    $path = "{$media->id}/original.{$media->type}";
-                    $url = secure_url('/'.str_replace('.', '', sn_site_root_directory_name()).'/'.$path);
-                    $urls['original'] = $url;
-                    $urls['thumbnail'] = $url;
-                }
-
-                // presentation layer typing
-
-                // POSSIBLE FILE TYPES
-                // image:   [ "gif", "jpeg", "jpg", "png", "webp", "heic", "svg" ]
-                // audio: [ "mp3" ]
-                // video: [ "3gp", "avi", "mov", "ogg", "ts", "mp4", "webm", "wmv" ]
-                // youtube: [ "yoputube" ]
-                // vimeo: [ "vimeo" ]
-                // document: [ "doc", "docx", "pdf", "ppt", "pptx", "txt",  "xls",  "xlsx" ]
-                // text: [ "txt" ]
-
-                /*
-
-                "gif"   => "image/*",
-                "heic"  => "image/*",
-                "heif"  => "image/*",
-                "jpg"   => "image/*",
-                "webp"  => "image/*",
-                "png"   => "image/*",
-                "svg"   => "image/*",
-
-                "3gp"   => "video/*",
-                "avi"   => "video/*",
-                "ts"    => "video/*",
-                "mp4"   => "video/*",
-                "webm"  => "video/*",
-                "mov"   => "video/*",
-                "ogg"   => "video/*",
-                "wmv"   => "video/*",
-
-                "doc"   => "application/*",
-                "docx"  => "application/*",
-                "pdf"   => "application/*",
-                "ppt"   => "application/*",
-                "pptx"  => "application/*",
-                "xls"   => "application/*",
-                "xlsx"  => "application/*"
-
-                "txt"   => "text/*",
-
-                "audio" => "audio/*",
-
-               {
-                    "type": "image|video|youtube|vimeo|document|audio|text",
-                    "media": ["9a8d126e-dcaa-4a84-ae62-347239e0a23f", "4a7d126x-ea4d-4a84-cc62-347239e92q17"],
-                }
-
-                */
-                // if(isset($request->vendor_media_id)) $media_type =  $request->type;
-                // else $media_type = explode('/', $mime_type)[0];
 
             }
-
-            // add the media to the topic content sort order
-            if (
-                isset($topic->content) &&
-                $request->has('topic_field') &&
-                $request->has('field_type') // content or metas
-            ) {
-
-                if ($request->field_type === 'content') {
-                    $holder = $topic->content;
-                } elseif ($request->field_type === 'metas') {
-                    $holder = $topic->metas;
-                }
-                if (isset($holder)) {
-                    if (! isset($holder)) {
-                        $holder = [];
-                    }
-                    if (! isset($holder[$request->get('topic_field')])) {
-                        $holder[$request->get('topic_field')] = [];
-                    }
-                    if (! in_array($media->id, $holder[$request->get('topic_field')])) {
-                        array_unshift($holder[$request->get('topic_field')], $media->id);
-                        // $media_key = 0;
-                    }
-                    // else $media_key = array_search($media->id, $holder[$request->get('topic_field')]);
-
-                    if ($request->field_type === 'content') {
-                        $topic->content = $holder;
-                    } else {
-                        $topic->metas = $holder;
-                    }
-                    $topic->save();
-                }
-
-            }
-
-            return response()->json([
-                'status' => 200,
-                'topic_id' => $topic_id,
-                'new_topic' => $new_topic,
-                'media_id' => $media->id,
-                'original_file_size' => $original_file_size,
-                'original_mime_type' => $mime_type,
-                'location' => $media->location,
-                'ext' => $media->type,
-                'urls' => $urls,
-                'created_by' => $media->created_by,
-                'created_at' => $media->created_at->format(sn_config('app.timeformat')),
-                'last_updated_by' => $media->last_updated_by,
-                'updated_at' => $media->updated_at->format(sn_config('app.timeformat')),
-            ]);
 
         } catch (Throwable $e) {
             Log::error($e->getMessage());
-
             return response()->json([
                 'status' => 200,
                 'topic_id' => null,
@@ -465,29 +382,21 @@ class MediaController extends Controller
         $topic = Topic::find($request->topic_id);
         if (
             isset($topic->content) &&
-            $request->has('field_type') &&
             $request->has('topic_field') &&
             $request->has('media_sort_order')
         ) {
-            if ($request->field_type === 'content') {
-                $holder = $topic->content;
-            } elseif ($request->field_type === 'metas') {
-                $holder = $topic->metas;
-            }
-            if (isset($holder) && is_array($request->media_sort_order)) {
-                $holder[$request->get('topic_field')]['value'] = array_unique($request->media_sort_order);
-                if ($request->field_type === 'content') {
-                    $topic->content = $holder;
-                } else {
-                    $topic->metas = $holder;
-                }
+
+            $content = $topic->content;
+            if (isset($content) && is_array($request->media_sort_order)) {
+                $content[$request->get('topic_field')]['value'] = array_unique($request->media_sort_order);
+                $topic->content = $content;
                 $topic->last_updated_by = Auth::id();
                 $topic->save();
 
                 return response()->json([
                     'status' => 200,
                     'topic_id' => $topic->id,
-                    'message' => "Sort order for {$request->field_type}->{$request->topic_field} has been updated...",
+                    'message' => "Sort order for {$request->topic_field} has been updated...",
                     'updated_sort_order' => $request->media_sort_order,
                 ]);
             }
@@ -500,43 +409,6 @@ class MediaController extends Controller
 
     }
 
-    public function all($topic_id = false, $topic_field_type = false, $topic_field = false)
-    {
-
-        $rawMedia = Media::orderByRaw('updated_at DESC')->get(); // all media
-        $ids = $rawMedia->pluck('id')->toArray();
-
-        // dd($ids, $topic_id, $topic_field);
-
-        // get field-specific media
-        $topic = null;
-        $fieldMedia = '';
-        if ($topic_id && $topic_field_type && $topic_field) {
-            $topic = Topic::find($topic_id);
-            // dd($ids, $topic_id, $topic_field_type, $topic_field, $topic);
-            if (
-                isset($topic->{$topic_field_type}) &&
-                isset($topic->{$topic_field_type}[$topic_field]) &&
-                is_array($topic->{$topic_field_type}[$topic_field]) &&
-                count($topic->{$topic_field_type}[$topic_field]) > 0
-            ) {
-                $fieldMedia = implode('|', $topic->{$topic_field_type}[$topic_field]['value']);
-            }
-        }
-
-        $data = [
-            'allMedia' => sn_dropzone_media($ids), // THIS IS WHERE I LEFT OFF. IT IS CORRECT TO THIS POINT. sn_dropzone_media() or a function it is calling is dropping the ball.
-            'fieldMedia' => $fieldMedia,
-            'topic' => $topic,
-            'topic_field_type' => $topic_field_type,
-            'topic_field' => $topic_field,
-        ];
-
-        // dd($data);
-
-        return response()->view('be.media.index', $data);
-
-    }
 
     public function assign(Request $request)
     {

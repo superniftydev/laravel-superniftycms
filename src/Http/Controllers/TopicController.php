@@ -6,8 +6,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Supernifty\CMS\Facades\CMS;
+use Illuminate\Support\Facades\View;
+use Supernifty\CMS\Facades\Helpers;
 use Supernifty\CMS\Models\Topic;
 use Throwable;
 
@@ -15,11 +17,48 @@ class TopicController extends Controller
 {
 
 
-    public function dashboard(Request $request){
+    public function render(Request $request){
+        # dd($request->all());
+
+        $error = 404;
+        if($request->path() === '/') $url = config('superniftycms.urls.home');
+        else $url = $request->path();
+        $topic = Topic::where('url', $url)->first();
+        # dd($topic);
+
+        # topic found
+        if(isset($topic->id)){
+
+            # dd($topic->getAttributes());
+
+            # topic not published and the user is not authenticated
+            if(!auth()->check() && $topic->status !== config('superniftycms.access.topics.published')) $error = 401;
+
+            # all good
+            else {
+
+                # confirm blade
+                view()->exists($topic->blade) ? $blade = $topic->blade : $blade = 'auto';
+
+               # return view
+                return response()->view($blade, [
+                    'topic' => $topic,
+                ], 200);
+
+            }
+
+        }
+
+        if(function_exists('sn_static_error')) sn_handle_error($error);
+        else Helpers::staticError($error);
+
+    }
+
+    public function cmsdash(Request $request){
 
         $user = Auth::user();
-        if(config('superniftycms.access.policy') !== '*'){
-            if(config('superniftycms.access.policy') === 'auth'){
+        if(config('superniftycms.access.cms.policy') !== '*'){
+            if(config('superniftycms.access.cms.policy') === 'auth'){
                 if(is_null($user)) return redirect()->guest(route('login'));
             }
             else {
@@ -30,7 +69,7 @@ class TopicController extends Controller
             }
         }
 
-        return response()->view('vendor.superniftycms.dashboard', [
+        return response()->view('cmsdash', [
             'user' => $user,
             'topics' => config('superniftycms.topics'),
         ], 200);
@@ -39,30 +78,7 @@ class TopicController extends Controller
 
 
 
-
-    // topic group index
-    public function index($id)
-    {
-        if (isset($id)) {
-            $parent = Topic::find($id);
-            if (isset($parent->id)) {
-                $children = Topic::where('parent', $parent->id)->orderBy('created_at', 'desc')->get();
-
-                // dd($children);
-                return response()->view('be.topics.index', [
-                    'parent' => $parent,
-                    'children' => $children,
-                ], 200);
-            }
-
-            return response()->view('be.errors.basic', [
-                'message' => "Couldn't find that topic.",
-            ], 200);
-        }
-    }
-
-
-    // confirm unique topic slug
+    # confirm unique topic slug
     public function validatetopicurl(Request $request)
     {
         $result = 'ng';
@@ -95,29 +111,28 @@ class TopicController extends Controller
         ]);
     }
 
-    public function manage($do)
+    public function index($do)
     {
 
 
         $user = Auth::user();
 
-
         if ($do === 'redirects') {
-            return redirect()->route('be.redirects.index');
+            return redirect()->route('superniftycms.redirects.index');
         }
 
         $x = Topic::where('functionality', $do)->get();
         $key = array_search($do, array_column(config('superniftycms.topics'), 'functionality'));
         $settings = config("superniftycms.topics.{$key}");
 
-        if (!$x->isEmpty()) $topics = CMS::organize_topics($x);
+        if (!$x->isEmpty()) $topics = Helpers::organize_topics($x);
         else $topics = [];
 
         # dd($topics, $key, $settings);
 
-        return response()->view('vendor.superniftycms.manage', [
+        return response()->view('topics.index', [
             'user' => $user,
-            'topics' => CMS::dash_topics($topics, 1),
+            'topics' => Helpers::dash_topics($topics, 1),
             'settings' => $settings,
         ], 200);
 
@@ -125,7 +140,7 @@ class TopicController extends Controller
 
     }
 
-    // create new topic
+    # create new topic
     public function create(Request $request)
     {
 
@@ -170,7 +185,7 @@ class TopicController extends Controller
         return redirect()->route('be.topic.edit', ['id' => $topic->id]);
     }
 
-    // edit topic content
+    # edit topic content
     public function edit($id)
     {
 
@@ -219,51 +234,15 @@ class TopicController extends Controller
             // $topic->content = $content;
 
             // clean up meta fields...
-            $metas = $topic->metas;
-            $metas_fso = $metas['sn_fso'];
-            foreach ($metas as $field_name => $values) {
-                if (isset($metas[$field_name]['type'])) {
-                    if ($metas[$field_name]['type'] === 'media') {
-                        if (! isset($metas[$field_name]['value'])) {
-                            $metas[$field_name]['value'] = [];
-                        }
-                        if (! isset($metas[$field_name]['aft'])) {
-                            $metas[$field_name]['aft'] = 'jpg,png,gif';
-                        }
-                    } elseif ($metas[$field_name]['type'] === 'text' || $metas[$field_name]['type'] === 'richtext') {
-                        if (! isset($metas[$field_name]['value'])) {
-                            $metas[$field_name]['value'] = '';
-                        }
-                        if (! isset($metas[$field_name]['max'])) {
-                            $metas[$field_name]['max'] = '999';
-                        }
-                    }
-                }
-            }
-            foreach ($metas_fso as $k => $field_name) {
-                if (! array_key_exists($field_name, $metas)) {
-                    unset($metas_fso[$k]);
-                }
-            }
-            foreach ($metas as $k => $v) {
-                if (! in_array($k, $metas_fso) && $k !== 'sn_fso') {
-                    $metas_fso[] = $k;
-                }
-            }
-            if ($k = array_search('sn_fso', $metas_fso) !== false) {
-                unset($metas_fso[$k]);
-            }
-            $metas['sn_fso'] = array_values($metas_fso);
-            $topic->metas = $metas;
 
-            // $topic->save();
+            # print "<pre>";
+            # print_r($topic->content);
+            # print_r($topic->metas);
+            # exit;
 
-            // print "<pre>";
-            // print_r($topic->content);
-            // print_r($topic->metas);
-            // exit;
+            $topic = Helpers::get_topic_media($topic);
 
-            $topic = CMS::get_topic_media($topic);
+            # dd($topic->getAttributes());
 
             // dd($topic);
             if (str_contains($topic->url, '/')) {
@@ -271,15 +250,15 @@ class TopicController extends Controller
                 array_pop($x);
                 $url_prefix = implode('/', $x);
             } else {
-                $url_prefix = sn_config('topics.topics.'.$topic->functionality.'.public_url');
+                $url_prefix = config('superniftycms.topics.'.$topic->functionality.'.public_url');
             }
 
-            return response()->view('be.topics.edit', [
+            return response()->view('topics.edit', [
                 'id' => $topic->id,
                 'user' => $user,
-                'sn_page_layouts' => sn_page_layouts($topic->functionality),
-                'sn_text_layouts' => sn_text_layouts(),
-                'sn_media_layouts' => sn_media_layouts(),
+                'sn_view_blades' => Helpers::get_blade_options($topic->functionality),
+                'sn_text_blades' => Helpers::get_blade_options('components/fields/text'),
+                'sn_media_blades' => Helpers::get_blade_options('components/fields/media'),
                 'topic' => $topic,
                 'url_prefix' => $url_prefix,
             ], 200);
@@ -290,8 +269,8 @@ class TopicController extends Controller
 
     }
 
-    // save the topic content
-    public function save(UpdateTopicRequest $request)
+    # save topic
+    public function save(Request $request)
     {
 
         $result = 'ng';
@@ -299,10 +278,22 @@ class TopicController extends Controller
             if (isset($request->id)) {
                 $topic = Topic::find($request->id);
                 if (isset($topic->id)) {
+
+
+
+                    $old_content = $topic->content;
+                    $new_content = $request->sn_content;
+                    foreach($new_content as $field_name => $values) {
+                        if(!str_contains($field_name, 'sn_fso')){
+                            isset($old_content[$field_name]['sn_style']) ? $new_content[$field_name]['sn_css'] = $old_content[$field_name]['sn_style'] : $new_content[$field_name]['sn_css'] = '';
+                            isset($old_content[$field_name]['sn_blade']) ? $new_content[$field_name]['sn_blade'] = $old_content[$field_name]['sn_blade'] : $new_content[$field_name]['sn_blade'] = '';
+                        }
+                    }
+                    $topic->content = $new_content;
+
                     $topic->title = $request->title;
                     $topic->url = $request->url;
-                    $topic->content = $request->content;
-                    $topic->layout = $request->layout;
+                    $topic->blade = $request->blade;
                     $topic->metas = $request->metas;
                     $topic->save();
                     $result = 'ok';
@@ -328,40 +319,57 @@ class TopicController extends Controller
     }
 
 
-    // create new topic
-    public function settings($id, $do = false)
+    public function saveFe(Request $request)
     {
 
-        $topic = Topic::find($id);
+        $html = null;
+        $result = 'ng';
+        try {
+            if (isset($request->t)) {
+                $topic = Topic::find($request->t);
+                if (isset($topic->id)) {
+                    $content = $topic->content;
+                    $content[$request->f][$request->k] = $request->v;
 
-        if ($topic->parent === null) {
-            if ($do === false) {
-                $do = 'edit_topic_settings_parent';
+                    if(isset($content[$request->f]['sn_style'])) unset($content[$request->f]['sn_style']);
+
+                    $topic->content = $content;
+                    $topic->save();
+                    $topic->fresh();
+                    $result = 'ok';
+                    $message = 'Topic updated.';
+                    if($request->k === "sn_blade"){
+                        # determine blade location
+                        # if($topic->content[$request->f]['type'] === 'media') $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['aft']}.{$topic->content[$request->f]['sn_blade']}";
+                        if($topic->content[$request->f]['type'] === 'media') $blade = "components.fields.{$topic->content[$request->f]['type']}.images.{$topic->content[$request->f]['sn_blade']}";
+                        else $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['sn_blade']}";
+                        if(View::exists($blade)) $html = View::make($blade)->with("topic", $topic)->with("field_name", $request->f)->render();
+                        else $html = "<p style=\"border:2px dashed currentColor!important;margin:1rem auto!important;padding:2rem!important;width:50vw!important;text-align:center!important;\">View [ {$topic->content[$request->f]['sn_blade']} ] is missing!</p>";
+                    }
+                } else {
+                    $message = 'Could not find that topic.';
+                }
+            } else {
+                $message = 'No topic ID provided. Topic not updated.';
             }
-            $parent = $topic;
-            $child = Topic::where([['slug', '=', $topic->slug], ['parent', '=', $topic->id]])->latest()->first(); // representative child for index display sort order
-            $secondary_topic = $child;
-        } else {
-            if ($do === false) {
-                $do = 'edit_topic_settings_child';
-            }
-            $parent = Topic::find($topic->parent); // parent holds labeling
-            $child = $topic;
-            $secondary_topic = $parent;
+        } catch (Throwable $e) {
+            $result = 'error';
+            $message = $e->getMessage();
+            Log::error($message);
         }
-        $target_topic = $topic;
 
-        return response()->view('be.topics.settings', [
-            'do' => $do,
-            'target_topic' => $target_topic,
-            'secondary_topic' => $secondary_topic,
-            'parent' => $parent,
-            'child' => $child,
-        ], 200);
+        return response()->json([
+            'status' => 200,
+            'result' => $result,
+            'message' => $message,
+            'html' => $html
+        ]);
+
     }
 
-    // save topic status
-    public function saveTopicStatus(UpdateTopicRequest $request)
+
+    # save topic status
+    public function saveTopicStatus(Request $request)
     {
 
         $result = 'ng';
@@ -394,7 +402,7 @@ class TopicController extends Controller
 
     }
 
-    // destroy topic field
+    # destroy topic field
     public function destroyTopicField(Request $request)
     {
         $data = $request->all();
@@ -426,7 +434,7 @@ class TopicController extends Controller
         ]);
     }
 
-    // save the text field value
+    # save the text field value
     public function saveTextFieldValue(Request $request)
     {
         $data = $request->all();
@@ -515,48 +523,67 @@ class TopicController extends Controller
     public function destroy(Request $request)
     {
         $topic = Topic::find($request->topic_id);
-        $do = $topic->functionality;
-        if (sn_can('content')) {
-            $topic->delete();
-
-            return redirect()->route('be.topics.manage', ['do' => $do]);
-        }
-
-        return redirect()->route('be.topics.manage', ['do' => $do])->with('error', 'You do not have permission to do this.');
+        $topic->delete();
+        return redirect()->route('superniftycms.topics.index', ['do' => $topic->functionality ]);
     }
 
-    public function zarp(Request $request)
+
+
+    public function settings($id, $do = false)
     {
 
-        $topic['content'] = [
-            '12345' => [
-                'headline' => [
-                    'type' => 'text',
-                    'max' => 99,
-                    'value' => 'Hello!',
-                ],
-                'description' => [
-                    'type' => 'text',
-                    'max' => 99,
-                    'value' => '<p>Just another description</p>',
-                ],
-                'featured_image' => [
-                    'type' => 'text',
-                    'max' => 99,
-                    'value' => ['12345', '21345', '31254'],
-                ],
-                'cta_text' => [
-                    'type' => 'text',
-                    'max' => 99,
-                    'value' => 'Learn More',
-                ],
-                'cta_link' => [
-                    'type' => 'text',
-                    'max' => 99,
-                    'value' => 'http://google.com',
-                ],
-            ],
-        ];
+        $topic = Topic::find($id);
 
+        if ($topic->parent === null) {
+            if ($do === false) {
+                $do = 'edit_topic_settings_parent';
+            }
+            $parent = $topic;
+            $child = Topic::where([['slug', '=', $topic->slug], ['parent', '=', $topic->id]])->latest()->first(); // representative child for index display sort order
+            $secondary_topic = $child;
+        } else {
+            if ($do === false) {
+                $do = 'edit_topic_settings_child';
+            }
+            $parent = Topic::find($topic->parent); // parent holds labeling
+            $child = $topic;
+            $secondary_topic = $parent;
+        }
+        $target_topic = $topic;
+
+        return response()->view('be.topics.settings', [
+            'do' => $do,
+            'target_topic' => $target_topic,
+            'secondary_topic' => $secondary_topic,
+            'parent' => $parent,
+            'child' => $child,
+        ], 200);
     }
+
+
+
+
+    # the below likely deprecated....
+
+    public function deprecated_index($id)
+    {
+        if (isset($id)) {
+            $parent = Topic::find($id);
+            if (isset($parent->id)) {
+                $children = Topic::where('parent', $parent->id)->orderBy('created_at', 'desc')->get();
+
+                // dd($children);
+                return response()->view('be.topics.index', [
+                    'parent' => $parent,
+                    'children' => $children,
+                ], 200);
+            }
+
+            return response()->view('be.errors.basic', [
+                'message' => "Couldn't find that topic.",
+            ], 200);
+        }
+    }
+
+
 }

@@ -1,6 +1,7 @@
 <?php
 
 use Supernifty\CMS\Commands\CMSCommand;
+
 use function Pest\Laravel\artisan;
 
 it('confirm baseline config functionality', function () {

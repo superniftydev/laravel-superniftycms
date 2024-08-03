@@ -4,8 +4,6 @@ namespace Supernifty\CMS\Http\Controllers;
 
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
-use FFMpeg\Format\Video\WebM;
-use FFMpeg\Format\Video\WMV;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +13,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Imagick\Driver;
 use Intervention\Image\ImageManager;
-use InvalidArgumentException;
 use Maestroerror\HeicToJpg;
 use Supernifty\CMS\Facades\Helpers;
 use Supernifty\CMS\Models\Media;
@@ -24,9 +21,7 @@ use Throwable;
 
 class MediaController extends Controller
 {
-
     protected $table = 'superniftycms_media';
-
 
     public function index($topic_id = false, $topic_field_type = false, $topic_field = false)
     {
@@ -66,26 +61,25 @@ class MediaController extends Controller
 
     }
 
-
-
     public function saver(Request $request)
     {
 
         try {
 
-
-            # featured image is being uploaded
-            if(
+            // featured image is being uploaded
+            if (
                 $request->hasFile('file') &&
                 $request->has('featured_media_id')
-            ){
+            ) {
 
                 $topic = Topic::find($request->topic_id);
-                if(isset($topic->id)){
+                if (isset($topic->id)) {
                     $file = $request->file('file');
                     $dimensions = explode('x', config('superniftycms.uploads.images.featured.dimensions'));
-                    if(Str::isUuid($request->featured_media_id)) $media = Media::find($request->featured_media_id);
-                    if(!isset($media->id)){
+                    if (Str::isUuid($request->featured_media_id)) {
+                        $media = Media::find($request->featured_media_id);
+                    }
+                    if (! isset($media->id)) {
                         $media = new Media;
                         $media->created_by = Auth::id();
                         $media->last_updated_by = Auth::id();
@@ -107,6 +101,7 @@ class MediaController extends Controller
                     $metas['featured_media_id'] = $media->id;
                     $topic->metas = $metas;
                     $topic->save();
+
                     return response()->json([
                         'status' => 200,
                         'topic' => $topic,
@@ -115,56 +110,68 @@ class MediaController extends Controller
                         'message' => 'the featured image has been updated...',
                     ]);
 
-
                 }
-
-
 
             }
 
-            # standard media files
+            // standard media files
             else {
 
                 $topic = Topic::find($request->topic_id);
                 $media = Media::find($request->media_id);
 
-                # new
-                if(!isset($media->id)) {
+                // new
+                if (! isset($media->id)) {
                     $media = new Media;
                     $media->created_by = Auth::id();
                     $media->last_updated_by = Auth::id();
                 }
 
-                # external vendor
-                if(isset($request->vendor_media_id)) {
+                // external vendor
+                if (isset($request->vendor_media_id)) {
                     $media->vendor_media_id = $request->vendor_media_id;
                     $media->type = $request->type;
                 }
 
-                # update metas
-                if(isset($request->metas)) $media = Helpers::update_media_metas($media, $request->metas);
+                // update metas
+                if (isset($request->metas)) {
+                    $media = Helpers::update_media_metas($media, $request->metas);
+                }
 
-                # add the media to the topic content sort order
+                // add the media to the topic content sort order
                 if (
                     isset($topic->content) &&
                     $request->has('topic_field') &&
-                    $request->has('field_type') # 'content' | 'metas'
+                    $request->has('field_type') // 'content' | 'metas'
                 ) {
-                    if($request->field_type === 'content') $holder = $topic->content;
-                    else $holder = $topic->metas;
-                    if(!is_array($holder)) $holder = [];
-                    if(isset($holder)) {
-                        if(!isset($holder[$request->get('topic_field')])) $holder[$request->get('topic_field')] = [];
-                        if(!in_array($media->id, $holder[$request->get('topic_field')])) array_unshift($holder[$request->get('topic_field')], $media->id);
-                        if($request->field_type === 'content') $topic->content = $holder;
-                        else $topic->metas = $holder;
+                    if ($request->field_type === 'content') {
+                        $holder = $topic->content;
+                    } else {
+                        $holder = $topic->metas;
+                    }
+                    if (! is_array($holder)) {
+                        $holder = [];
+                    }
+                    if (isset($holder)) {
+                        if (! isset($holder[$request->get('topic_field')])) {
+                            $holder[$request->get('topic_field')] = [];
+                        }
+                        if (! in_array($media->id, $holder[$request->get('topic_field')])) {
+                            array_unshift($holder[$request->get('topic_field')], $media->id);
+                        }
+                        if ($request->field_type === 'content') {
+                            $topic->content = $holder;
+                        } else {
+                            $topic->metas = $holder;
+                        }
                         $topic->save();
                     }
                 }
 
-                # existing ( no file upload )
-                if(!$request->hasFile('file')) {
+                // existing ( no file upload )
+                if (! $request->hasFile('file')) {
                     $media->save();
+
                     return response()->json([
                         'status' => 200,
                         'media' => $media,
@@ -172,7 +179,7 @@ class MediaController extends Controller
                     ]);
                 }
 
-                # a file is being uploaded - this is new
+                // a file is being uploaded - this is new
                 else {
 
                     $metas = $media->metas;
@@ -181,26 +188,30 @@ class MediaController extends Controller
                     $mime_type = $file->getMimeType();
                     $media->type = $file->extension(); // jpg | png | gif | m4v | pdf | doc | aif | heic | heif | etc ( laravel uses mime type to determine file extension)
 
-                    # special cases
-                    if($media->type === 'heic' || $media->type === 'heif') $media->type = 'jpg';
-                    if($media->type === 'bin') $media->type = 'glb';
+                    // special cases
+                    if ($media->type === 'heic' || $media->type === 'heif') {
+                        $media->type = 'jpg';
+                    }
+                    if ($media->type === 'bin') {
+                        $media->type = 'glb';
+                    }
 
                     $metas['title'] = $file->getClientOriginalName();
                     $metas['original_file_size'] = $original_file_size;
                     $media->metas = $metas;
 
-                    # heic/heif - convert to jpg - later. getting the required server software installed is a pita...
-                    # https://image.intervention.io/v3/introduction/frameworks#integration
-                    # if (in_array($mime_type, ['image/heic', 'image/heif'])) {
-                    #     $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default')); // store the original
-                    #     $converted = HeicToJpg::convert($path_prefix.$media->id.'/original.'.$file->extension()); // convert the original to a jpg
-                    #     $converted->saveAs($path_prefix.$media->id.'/original.jpg'); // save the original as a jpg
-                    # }
+                    // heic/heif - convert to jpg - later. getting the required server software installed is a pita...
+                    // https://image.intervention.io/v3/introduction/frameworks#integration
+                    // if (in_array($mime_type, ['image/heic', 'image/heif'])) {
+                    //     $file->storeAs($media_root_directory, 'original.'.$file->extension(), config('filesystems.default')); // store the original
+                    //     $converted = HeicToJpg::convert($path_prefix.$media->id.'/original.'.$file->extension()); // convert the original to a jpg
+                    //     $converted->saveAs($path_prefix.$media->id.'/original.jpg'); // save the original as a jpg
+                    // }
 
-                    # it must be saved at this point in order to create the parent directory
+                    // it must be saved at this point in order to create the parent directory
                     $media->save();
 
-                    # pixel-based images
+                    // pixel-based images
                     if (in_array($media->type, config('superniftycms.uploads.images.process'))) {
                         try {
                             $ext = $file->extension();
@@ -214,16 +225,17 @@ class MediaController extends Controller
                             $image = $manager->read($request->file('file'));
                             Storage::disk(config('superniftycms.uploads.disk'))->put(config('superniftycms.uploads.storage_directory')."/{$media->id}/original.".$file->extension(), (string) $image->encodeByExtension($file->extension()), 'public');
 
-                            $urls['original']  = Helpers::media_upload_url($media, 'original');
+                            $urls['original'] = Helpers::media_upload_url($media, 'original');
                             $urls['thumbnail'] = Helpers::media_upload_url($media, 'thumbnail');
 
-                            # print_r($request->all());
-                            # print_r($media->getAttributes());
-                            # print Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$ext);
-                            # exit;
+                            // print_r($request->all());
+                            // print_r($media->getAttributes());
+                            // print Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$ext);
+                            // exit;
 
                         } catch (Throwable $e) {
                             Log::error($e->getMessage());
+
                             return response()->json([
                                 'status' => 200,
                                 'topic_id' => null,
@@ -237,35 +249,33 @@ class MediaController extends Controller
                     elseif (in_array($media->type, config('superniftycms.uploads.videos.process'))) {
                         $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.'.$file->extension(), config('superniftycms.uploads.disk'));
 
-                        # grab poster frame
+                        // grab poster frame
                         $ffmpeg = FFMpeg::create(config('superniftycms.uploads.videos.ffmpeg'), null);
                         $video = $ffmpeg->open(Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$file->extension()));
                         $video
-                            ->frame(TimeCode::fromSeconds(1)) # create poster 1 second in
+                            ->frame(TimeCode::fromSeconds(1)) // create poster 1 second in
                             ->save(Storage::disk(config('superniftycms.uploads.disk'))->path(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/poster.jpg'));
                         $urls['poster'] = $urls['thumbnail'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/poster.jpg');
 
                     }
 
-                    # bins that have been converted to glb in this temporary patch
+                    // bins that have been converted to glb in this temporary patch
                     elseif ($media->type === 'glb') {
                         $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.glb', config('superniftycms.uploads.disk'));
                         $urls['original'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.glb');
                     }
 
-                     // svgs
+                    // svgs
                     elseif ($mime_type === 'image/svg+xml') {
                         $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.glb', config('superniftycms.uploads.disk'));
                         $urls['original'] = $urls['thumbnail'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.svg');
                     }
 
-                    # all other file types
+                    // all other file types
                     else {
                         $file->storeAs(config('superniftycms.uploads.storage_directory').'/'.$media->id, 'original.'.$file->extension(), config('superniftycms.uploads.disk'));
                         $urls['original'] = Storage::disk(config('superniftycms.uploads.disk'))->url(config('superniftycms.uploads.storage_directory').'/'.$media->id.'/original.'.$media->type);
                     }
-
-
 
                 }
 
@@ -283,11 +293,11 @@ class MediaController extends Controller
                     'updated_at' => $media->updated_at->format(config('superniftycms.ui.time_format')),
                 ]);
 
-
             }
 
         } catch (Throwable $e) {
             Log::error($e->getMessage());
+
             return response()->json([
                 'status' => 200,
                 'topic_id' => null,
@@ -298,7 +308,6 @@ class MediaController extends Controller
         }
 
     }
-
 
     public function updatedetails(UpdateMediaRequest $request)
     {
@@ -409,7 +418,6 @@ class MediaController extends Controller
 
     }
 
-
     public function assign(Request $request)
     {
 
@@ -516,5 +524,4 @@ class MediaController extends Controller
         }
 
     }
-
 }

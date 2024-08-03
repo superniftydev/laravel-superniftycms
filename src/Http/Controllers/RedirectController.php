@@ -7,11 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-
-
 class RedirectController extends Controller
 {
-
     protected $table = 'superniftycms_redirects';
 
     // redirects index

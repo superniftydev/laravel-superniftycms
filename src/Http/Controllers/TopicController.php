@@ -2,11 +2,9 @@
 
 namespace Supernifty\CMS\Http\Controllers;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\View;
 use Supernifty\CMS\Facades\Helpers;
@@ -15,32 +13,36 @@ use Throwable;
 
 class TopicController extends Controller
 {
-
-
-    public function render(Request $request){
-        # dd($request->all());
+    public function render(Request $request)
+    {
+        // dd($request->all());
 
         $error = 404;
-        if($request->path() === '/') $url = config('superniftycms.urls.home');
-        else $url = $request->path();
+        if ($request->path() === '/') {
+            $url = config('superniftycms.urls.home');
+        } else {
+            $url = $request->path();
+        }
         $topic = Topic::where('url', $url)->first();
-        # dd($topic);
+        // dd($topic);
 
-        # topic found
-        if(isset($topic->id)){
+        // topic found
+        if (isset($topic->id)) {
 
-            # dd($topic->getAttributes());
+            // dd($topic->getAttributes());
 
-            # topic not published and the user is not authenticated
-            if(!auth()->check() && $topic->status !== config('superniftycms.access.topics.published')) $error = 401;
+            // topic not published and the user is not authenticated
+            if (! auth()->check() && $topic->status !== config('superniftycms.access.topics.published')) {
+                $error = 401;
+            }
 
-            # all good
+            // all good
             else {
 
-                # confirm blade
+                // confirm blade
                 view()->exists($topic->blade) ? $blade = $topic->blade : $blade = 'auto';
 
-               # return view
+                // return view
                 return response()->view($blade, [
                     'topic' => $topic,
                 ], 200);
@@ -49,23 +51,30 @@ class TopicController extends Controller
 
         }
 
-        if(function_exists('sn_static_error')) sn_handle_error($error);
-        else Helpers::staticError($error);
+        if (function_exists('sn_static_error')) {
+            sn_handle_error($error);
+        } else {
+            Helpers::staticError($error);
+        }
 
     }
 
-    public function cmsdash(Request $request){
+    public function cmsdash(Request $request)
+    {
 
         $user = Auth::user();
-        if(config('superniftycms.access.cms.policy') !== '*'){
-            if(config('superniftycms.access.cms.policy') === 'auth'){
-                if(is_null($user)) return redirect()->guest(route('login'));
-            }
-            else {
+        if (config('superniftycms.access.cms.policy') !== '*') {
+            if (config('superniftycms.access.cms.policy') === 'auth') {
+                if (is_null($user)) {
+                    return redirect()->guest(route('login'));
+                }
+            } else {
                 $model = config('superniftycms.auth.model');
                 $column = config('superniftycms.auth.column');
                 $value = config('superniftycms.auth.value');
-                if($$model->$column !== $value) { dd('you are not authorized to use this feature...'); }
+                if ($$model->$column !== $value) {
+                    dd('you are not authorized to use this feature...');
+                }
             }
         }
 
@@ -75,10 +84,7 @@ class TopicController extends Controller
         ], 200);
     }
 
-
-
-
-    # confirm unique topic slug
+    // confirm unique topic slug
     public function validatetopicurl(Request $request)
     {
         $result = 'ng';
@@ -114,7 +120,6 @@ class TopicController extends Controller
     public function index($do)
     {
 
-
         $user = Auth::user();
 
         if ($do === 'redirects') {
@@ -125,10 +130,13 @@ class TopicController extends Controller
         $key = array_search($do, array_column(config('superniftycms.topics'), 'functionality'));
         $settings = config("superniftycms.topics.{$key}");
 
-        if (!$x->isEmpty()) $topics = Helpers::organize_topics($x);
-        else $topics = [];
+        if (! $x->isEmpty()) {
+            $topics = Helpers::organize_topics($x);
+        } else {
+            $topics = [];
+        }
 
-        # dd($topics, $key, $settings);
+        // dd($topics, $key, $settings);
 
         return response()->view('topics.index', [
             'user' => $user,
@@ -136,11 +144,9 @@ class TopicController extends Controller
             'settings' => $settings,
         ], 200);
 
-
-
     }
 
-    # create new topic
+    // create new topic
     public function create(Request $request)
     {
 
@@ -164,7 +170,7 @@ class TopicController extends Controller
             }
         }
         if (! isset($topic->content)) {
-            $topic = new Topic();
+            $topic = new Topic;
             $topic->functionality = $request->functionality;
             $topic->content = sn_default_topic_content();
             $topic->metas = sn_default_topic_metas();
@@ -185,7 +191,7 @@ class TopicController extends Controller
         return redirect()->route('be.topic.edit', ['id' => $topic->id]);
     }
 
-    # edit topic content
+    // edit topic content
     public function edit($id)
     {
 
@@ -235,14 +241,14 @@ class TopicController extends Controller
 
             // clean up meta fields...
 
-            # print "<pre>";
-            # print_r($topic->content);
-            # print_r($topic->metas);
-            # exit;
+            // print "<pre>";
+            // print_r($topic->content);
+            // print_r($topic->metas);
+            // exit;
 
             $topic = Helpers::get_topic_media($topic);
 
-            # dd($topic->getAttributes());
+            // dd($topic->getAttributes());
 
             // dd($topic);
             if (str_contains($topic->url, '/')) {
@@ -269,7 +275,7 @@ class TopicController extends Controller
 
     }
 
-    # save topic
+    // save topic
     public function save(Request $request)
     {
 
@@ -279,12 +285,10 @@ class TopicController extends Controller
                 $topic = Topic::find($request->id);
                 if (isset($topic->id)) {
 
-
-
                     $old_content = $topic->content;
                     $new_content = $request->sn_content;
-                    foreach($new_content as $field_name => $values) {
-                        if(!str_contains($field_name, 'sn_fso')){
+                    foreach ($new_content as $field_name => $values) {
+                        if (! str_contains($field_name, 'sn_fso')) {
                             isset($old_content[$field_name]['sn_style']) ? $new_content[$field_name]['sn_css'] = $old_content[$field_name]['sn_style'] : $new_content[$field_name]['sn_css'] = '';
                             isset($old_content[$field_name]['sn_blade']) ? $new_content[$field_name]['sn_blade'] = $old_content[$field_name]['sn_blade'] : $new_content[$field_name]['sn_blade'] = '';
                         }
@@ -318,7 +322,6 @@ class TopicController extends Controller
 
     }
 
-
     public function saveFe(Request $request)
     {
 
@@ -331,20 +334,28 @@ class TopicController extends Controller
                     $content = $topic->content;
                     $content[$request->f][$request->k] = $request->v;
 
-                    if(isset($content[$request->f]['sn_style'])) unset($content[$request->f]['sn_style']);
+                    if (isset($content[$request->f]['sn_style'])) {
+                        unset($content[$request->f]['sn_style']);
+                    }
 
                     $topic->content = $content;
                     $topic->save();
                     $topic->fresh();
                     $result = 'ok';
                     $message = 'Topic updated.';
-                    if($request->k === "sn_blade"){
-                        # determine blade location
-                        # if($topic->content[$request->f]['type'] === 'media') $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['aft']}.{$topic->content[$request->f]['sn_blade']}";
-                        if($topic->content[$request->f]['type'] === 'media') $blade = "components.fields.{$topic->content[$request->f]['type']}.images.{$topic->content[$request->f]['sn_blade']}";
-                        else $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['sn_blade']}";
-                        if(View::exists($blade)) $html = View::make($blade)->with("topic", $topic)->with("field_name", $request->f)->render();
-                        else $html = "<p style=\"border:2px dashed currentColor!important;margin:1rem auto!important;padding:2rem!important;width:50vw!important;text-align:center!important;\">View [ {$topic->content[$request->f]['sn_blade']} ] is missing!</p>";
+                    if ($request->k === 'sn_blade') {
+                        // determine blade location
+                        // if($topic->content[$request->f]['type'] === 'media') $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['aft']}.{$topic->content[$request->f]['sn_blade']}";
+                        if ($topic->content[$request->f]['type'] === 'media') {
+                            $blade = "components.fields.{$topic->content[$request->f]['type']}.images.{$topic->content[$request->f]['sn_blade']}";
+                        } else {
+                            $blade = "components.fields.{$topic->content[$request->f]['type']}.{$topic->content[$request->f]['sn_blade']}";
+                        }
+                        if (View::exists($blade)) {
+                            $html = View::make($blade)->with('topic', $topic)->with('field_name', $request->f)->render();
+                        } else {
+                            $html = "<p style=\"border:2px dashed currentColor!important;margin:1rem auto!important;padding:2rem!important;width:50vw!important;text-align:center!important;\">View [ {$topic->content[$request->f]['sn_blade']} ] is missing!</p>";
+                        }
                     }
                 } else {
                     $message = 'Could not find that topic.';
@@ -362,13 +373,12 @@ class TopicController extends Controller
             'status' => 200,
             'result' => $result,
             'message' => $message,
-            'html' => $html
+            'html' => $html,
         ]);
 
     }
 
-
-    # save topic status
+    // save topic status
     public function saveTopicStatus(Request $request)
     {
 
@@ -402,7 +412,7 @@ class TopicController extends Controller
 
     }
 
-    # destroy topic field
+    // destroy topic field
     public function destroyTopicField(Request $request)
     {
         $data = $request->all();
@@ -434,7 +444,7 @@ class TopicController extends Controller
         ]);
     }
 
-    # save the text field value
+    // save the text field value
     public function saveTextFieldValue(Request $request)
     {
         $data = $request->all();
@@ -524,10 +534,9 @@ class TopicController extends Controller
     {
         $topic = Topic::find($request->topic_id);
         $topic->delete();
-        return redirect()->route('superniftycms.topics.index', ['do' => $topic->functionality ]);
+
+        return redirect()->route('superniftycms.topics.index', ['do' => $topic->functionality]);
     }
-
-
 
     public function settings($id, $do = false)
     {
@@ -560,10 +569,7 @@ class TopicController extends Controller
         ], 200);
     }
 
-
-
-
-    # the below likely deprecated....
+    // the below likely deprecated....
 
     public function deprecated_index($id)
     {
@@ -584,6 +590,4 @@ class TopicController extends Controller
             ], 200);
         }
     }
-
-
 }

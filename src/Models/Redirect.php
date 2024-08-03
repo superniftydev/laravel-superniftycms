@@ -10,6 +10,6 @@ class Redirect extends Model
 {
     use HasFactory;
     use HasUuids;
-    protected $table = 'superniftycms_redirects';
 
+    protected $table = 'superniftycms_redirects';
 }
